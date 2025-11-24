@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ContractData, ContractItem, Clause, PartyInfo } from '../types';
 import { DEFAULT_ITEMS, PRESET_CLAUSES } from '../constants';
 import { v4 as uuidv4 } from 'uuid';
-import { Trash2, Plus, ArrowRight, Save, Printer, ArrowLeft, CheckSquare, Square, FileText, Edit2, X, Check, Building2, User } from 'lucide-react';
-import ClauseGenerator from './ClauseGenerator';
+import { Trash2, Plus, ArrowRight, Save, Printer, ArrowLeft, CheckSquare, Square, FileText, Edit2, X, Check, Building2, User, ArrowUp, ArrowDown, PlusCircle } from 'lucide-react';
 
 interface Props {
   initialData: ContractData;
@@ -21,7 +20,7 @@ const CATEGORIES: { id: Clause['category'] | 'all', label: string }[] = [
   { id: 'payment', label: '付款條件' },
   { id: 'safety', label: '安全衛生' },
   { id: 'environment', label: '環保清潔' },
-  { id: 'custom', label: '客製化' },
+  { id: 'custom', label: '特殊條款' },
 ];
 
 const ContractBuilder: React.FC<Props> = ({ 
@@ -40,6 +39,9 @@ const ContractBuilder: React.FC<Props> = ({
   const [editingClauseId, setEditingClauseId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [editCategory, setEditCategory] = useState<Clause['category']>('custom');
+  
+  // Manual Clause Input State
+  const [customClauseText, setCustomClauseText] = useState('');
   
   // Filter State
   const [activeCategory, setActiveCategory] = useState<Clause['category'] | 'all'>('all');
@@ -121,11 +123,13 @@ const ContractBuilder: React.FC<Props> = ({
     }));
   };
 
-  const addCustomClause = (text: string) => {
+  const handleAddCustomClause = () => {
+    if (!customClauseText.trim()) return;
+
     const newClause: Clause = {
       id: uuidv4(),
-      category: 'custom', // Default to custom, can be edited later
-      content: text,
+      category: 'custom', 
+      content: customClauseText,
       isCustom: true,
       selected: true
     };
@@ -133,8 +137,9 @@ const ContractBuilder: React.FC<Props> = ({
       ...prev,
       clauses: [...prev.clauses, newClause]
     }));
-    // Optional: Switch to custom tab to show the new item
-    setActiveCategory('custom');
+    
+    setCustomClauseText('');
+    setActiveCategory('custom'); // Switch to custom tab to see the new item
   };
 
   const startEditing = (e: React.MouseEvent, clause: Clause) => {
@@ -162,6 +167,30 @@ const ContractBuilder: React.FC<Props> = ({
     e.stopPropagation();
     setEditingClauseId(null);
     setEditContent('');
+  };
+
+  const deleteClause = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (window.confirm('確定要刪除此條款嗎？')) {
+      setData(prev => ({
+        ...prev,
+        clauses: prev.clauses.filter(c => c.id !== id)
+      }));
+    }
+  };
+
+  // Reordering Clauses
+  const moveClause = (e: React.MouseEvent, index: number, direction: 'up' | 'down') => {
+    e.stopPropagation();
+    const newClauses = [...data.clauses];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+
+    if (targetIndex < 0 || targetIndex >= newClauses.length) return;
+
+    // Swap
+    [newClauses[index], newClauses[targetIndex]] = [newClauses[targetIndex], newClauses[index]];
+    
+    setData(prev => ({ ...prev, clauses: newClauses }));
   };
 
   // --- Render Steps ---
@@ -337,6 +366,7 @@ const ContractBuilder: React.FC<Props> = ({
                     <th className="p-3 w-32">單價</th>
                     <th className="p-3 w-32">數量</th>
                     <th className="p-3 w-32">小計</th>
+                    <th className="p-3 w-48">備註 (但書)</th>
                     <th className="p-3 w-16 rounded-tr-lg"></th>
                   </tr>
                 </thead>
@@ -378,6 +408,14 @@ const ContractBuilder: React.FC<Props> = ({
                       <td className="p-3 font-medium text-slate-700">
                         {(item.price * item.quantity).toLocaleString()}
                       </td>
+                      <td className="p-3">
+                        <input 
+                          value={item.note || ''} 
+                          onChange={(e) => updateItem(item.id, 'note', e.target.value)}
+                          className="w-full bg-transparent border-b border-transparent focus:border-blue-400 outline-none text-sm text-slate-500" 
+                          placeholder="備註..."
+                        />
+                      </td>
                       <td className="p-3 text-right">
                         <button onClick={() => removeItem(item.id)} className="text-slate-300 hover:text-red-500 transition-colors">
                           <Trash2 size={18} />
@@ -390,7 +428,7 @@ const ContractBuilder: React.FC<Props> = ({
                   <tr className="bg-slate-50 font-bold text-slate-800">
                     <td colSpan={4} className="p-3 text-right">總計金額 (未稅)</td>
                     <td className="p-3 text-blue-600 text-lg">{data.totalAmount.toLocaleString()}</td>
-                    <td></td>
+                    <td colSpan={2}></td>
                   </tr>
                 </tfoot>
               </table>
@@ -403,7 +441,31 @@ const ContractBuilder: React.FC<Props> = ({
   const renderStep3_Clauses = () => (
     <div className="space-y-6 animate-fade-in">
       
-      <ClauseGenerator onAddClause={addCustomClause} />
+      {/* Manual Clause Input Section (Replaces ClauseGenerator) */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+          <PlusCircle className="w-5 h-5 text-blue-600"/>
+          新增自訂條款
+        </h3>
+        <p className="text-sm text-slate-500 mb-3">
+          請直接輸入您想新增的特殊約定或條款內容，例如：特殊材料計價、颱風停工標準等。
+        </p>
+        <div className="flex gap-2 items-start">
+          <textarea
+            value={customClauseText}
+            onChange={(e) => setCustomClauseText(e.target.value)}
+            placeholder="請在此輸入條款內容..."
+            className="flex-1 border border-slate-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-200 outline-none min-h-[80px] text-slate-700 leading-relaxed resize-y"
+          />
+          <button
+            onClick={handleAddCustomClause}
+            disabled={!customClauseText.trim()}
+            className="bg-blue-600 text-white px-5 py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 h-fit font-medium transition-colors shadow-sm"
+          >
+            <Plus size={18} /> 新增
+          </button>
+        </div>
+      </div>
 
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
         <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
@@ -429,9 +491,12 @@ const ContractBuilder: React.FC<Props> = ({
         </div>
 
         <div className="space-y-3">
-          {data.clauses
-            .filter(c => activeCategory === 'all' || c.category === activeCategory)
-            .map(clause => {
+          {data.clauses.map((clause, index) => {
+            // Filter Logic
+            if (activeCategory !== 'all' && clause.category !== activeCategory) {
+              return null;
+            }
+
             const isEditing = editingClauseId === clause.id;
             
             return (
@@ -473,7 +538,27 @@ const ContractBuilder: React.FC<Props> = ({
                        </span>
                      )}
 
-                     <div className="flex gap-2 ml-auto">
+                     <div className="flex gap-2 ml-auto items-center">
+                        {/* Sort Arrows */}
+                        {!isEditing && (
+                          <div className="flex gap-1 mr-2 bg-white rounded border border-slate-200">
+                             <button 
+                               onClick={(e) => moveClause(e, index, 'up')}
+                               disabled={index === 0}
+                               className="p-1 hover:bg-slate-100 disabled:text-slate-200 text-slate-500"
+                             >
+                               <ArrowUp size={14}/>
+                             </button>
+                             <button 
+                               onClick={(e) => moveClause(e, index, 'down')}
+                               disabled={index === data.clauses.length - 1}
+                               className="p-1 hover:bg-slate-100 disabled:text-slate-200 text-slate-500"
+                             >
+                               <ArrowDown size={14}/>
+                             </button>
+                          </div>
+                        )}
+
                         {isEditing ? (
                           <>
                             <button 
@@ -490,13 +575,22 @@ const ContractBuilder: React.FC<Props> = ({
                             </button>
                           </>
                         ) : (
-                          <button 
-                            onClick={(e) => startEditing(e, clause)}
-                            className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                            title="編輯條款"
-                          >
-                            <Edit2 size={16} />
-                          </button>
+                          <>
+                            <button 
+                              onClick={(e) => startEditing(e, clause)}
+                              className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                              title="編輯條款"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button 
+                              onClick={(e) => deleteClause(e, clause.id)}
+                              className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                              title="刪除條款"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </>
                         )}
                      </div>
                   </div>
@@ -521,7 +615,7 @@ const ContractBuilder: React.FC<Props> = ({
           
           {data.clauses.filter(c => activeCategory === 'all' || c.category === activeCategory).length === 0 && (
              <div className="text-center py-8 text-slate-400 italic">
-               此分類尚無條款，請使用上方 AI 助理新增。
+               此分類尚無條款，請使用上方表單新增。
              </div>
           )}
         </div>

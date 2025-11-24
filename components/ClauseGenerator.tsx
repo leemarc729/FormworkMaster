@@ -61,7 +61,7 @@ const ClauseGenerator: React.FC<Props> = ({ onAddClause }) => {
       {result && (
         <div className="bg-white p-4 rounded-lg border border-indigo-100 shadow-sm animate-fade-in">
           <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">AI 建議內容</h4>
-          <p className="text-gray-800 mb-4 leading-relaxed">{result}</p>
+          <p className="text-gray-800 mb-4 leading-relaxed whitespace-pre-wrap">{result}</p>
           <button
             onClick={() => {
               onAddClause(result);
