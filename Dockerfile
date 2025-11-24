@@ -1,21 +1,24 @@
-# Step 1: Build frontend
-FROM node:20 AS build
-
+# Step 1 — Build
+FROM node:18 AS builder
 WORKDIR /app
-COPY . .
+
+# Copy files
+COPY package*.json ./
 RUN npm install
+
+COPY . .
+
+# Build Vite project
 RUN npm run build
 
-# Step 2: Serve with Nginx
-FROM nginx:stable-alpine
+# Step 2 — Run
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy built Vite files to Nginx html folder
-COPY --from=build /app/dist /usr/share/nginx/html
-
-# Cloud Run requires listening on $PORT, not 80
-# So we rewrite Nginx default config to use $PORT
-RUN sed -i 's/listen       80;/listen       ${PORT};/g' /etc/nginx/conf.d/default.conf
-
+# Cloud Run uses PORT env
 EXPOSE 8080
+
+# Replace default nginx config to use Cloud Run port
+RUN sed -i 's/listen 80;/listen 8080;/' /etc/nginx/conf.d/default.conf
 
 CMD ["nginx", "-g", "daemon off;"]
